@@ -2,13 +2,15 @@ import streamlit as st
 import cv2
 import numpy as np
 import sounddevice as sd
+import soundfile as sf
+
 from google.cloud import speech
 import io
 import os
 from google.cloud import storage
 
 # Function to capture audio
-def capture_audio(duration=300, fs=16000):
+def capture_audio(duration=15, fs=16000):
     sd.default.samplerate = fs
     sd.default.channels = 1
     audio_data = sd.rec(int(duration * fs), samplerate=fs, channels=1)
@@ -55,16 +57,15 @@ def main():
     if st.button("Start Recording"):
         while True:
             # Capture audio and video
+            st.write("Capturing Audio & Video")
             audio_data = capture_audio()
             frame = capture_video_frame()
 
             # Save audio and image
+            st.write(f"Saving Audio & Image to {audio_filename} and {image_filename}")
             audio_filename = "temp_audio.wav"
             image_filename = "temp_image.jpg"
-            sd.wait()
-            with open (audio_filename, "wb") as f:
-                f.write(audio_data.tobytes())
-        
+            sf.write(audio_filename, audio_data, 16000)
             cv2.imwrite(image_filename, frame)
 
             # Upload to Google Cloud Storage (replace with your bucket name)

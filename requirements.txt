@@ -1,2 +1,4 @@
 sounddevice
+soundfile
 google-cloud-speech
+google-cloud-aiplatform
