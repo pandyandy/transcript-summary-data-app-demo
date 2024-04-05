@@ -8,7 +8,7 @@ import os
 from google.cloud import storage
 
 # Function to capture audio
-def capture_audio(duration=30, fs=16000):
+def capture_audio(duration=300, fs=16000):
     sd.default.samplerate = fs
     sd.default.channels = 1
     audio_data = sd.rec(int(duration * fs), samplerate=fs, channels=1)
@@ -61,12 +61,15 @@ def main():
             # Save audio and image
             audio_filename = "temp_audio.wav"
             image_filename = "temp_image.jpg"
-            sd.write(audio_filename, audio_data, 16000)
+            sd.wait()
+            with open (audio_filename, "wb") as f:
+                f.write(audio_data.tobytes())
+        
             cv2.imwrite(image_filename, frame)
 
             # Upload to Google Cloud Storage (replace with your bucket name)
-            upload_blob("your-bucket-name", audio_filename, "audio.wav")
-            upload_blob("your-bucket-name", image_filename, "image.jpg")
+            upload_blob("vojta-transcript-demo-test", audio_filename, "audio.wav")
+            upload_blob("vojta-transcript-demo-test", image_filename, "image.jpg")
 
             # Transcribe audio
             transcript = transcribe_audio(audio_data)
