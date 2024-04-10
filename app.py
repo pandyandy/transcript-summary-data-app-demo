@@ -46,17 +46,9 @@ def transcribe_audio(audio_file_path, language_code="en-US"):
         language_code=language_code,
     )
     response = client.recognize(config=config, audio=audio)
+    transcript = ' '.join([alternative.transcript for result in response.results for alternative in result.alternatives])
     
-    # I was just checking cause of some weird error
-    if response.results:
-        if response.results[0].alternatives:
-            return response.results[0].alternatives[0].transcript
-        else:
-            print("No alternatives found in the first result.")
-            return None
-    else:
-        print("No results found in the response.")
-        return None
+    return transcript
     
 # Function to generate summary using Gemini
 def generate(content):
