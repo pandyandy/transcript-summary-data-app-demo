@@ -4,10 +4,17 @@ import soundfile as sf
 import vertexai
 import cv2
 import io
+import os
+import base64
 import vertexai.preview.generative_models as generative_models
 
 from google.cloud import speech, storage
 from vertexai.generative_models import GenerativeModel, Part, FinishReason
+
+image_path = os.path.dirname(os.path.abspath(__file__))
+
+KBC_LOGO = image_path + "/static/keboola_mini.png"
+GC_LOGO = image_path + "/static/google_mini.png"
 
 # Function to capture audio
 def capture_audio(duration=15, fs=16000):
@@ -82,6 +89,18 @@ def generate(content):
 
 # Streamlit app
 def main():
+    
+    logo_html = f'''
+    <div style="display: flex; align-items: center; justify-content: right; font-size: 30px;">
+        <img src="data:image/png;base64,{base64.b64encode(open(KBC_LOGO, "rb").read()).decode()}" style="height: 60px;">
+        <span style="margin: 0 20px;">➕</span>
+        <img src="data:image/png;base64,{base64.b64encode(open(GC_LOGO, "rb").read()).decode()}" style="height: 60px;">
+        <span style="margin: 0 20px;">🟰</span>
+        <span>❤️</span>
+    </div>
+    '''
+
+    st.markdown(f"{logo_html}", unsafe_allow_html=True)
     st.title("Audio Recording and Summarization")
 
     recording_state = st.session_state.get('recording', False)
