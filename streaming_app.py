@@ -1,83 +1,84 @@
 import queue
-import streamlit as st
-import sounddevice as sd
-import numpy as np
 import threading
-from google.cloud import speech_v1p1beta1 as speech
+import sounddevice as sd
+from google.cloud import speech
 from google.oauth2 import service_account
+import streamlit as st
 
-# Initialize Google Cloud Speech Client
-# Note: Ensure your GCP credentials are correctly configured for this to work.
+# Assuming your Google Cloud credentials are set up in Streamlit's secrets
 #credentials = service_account.Credentials.from_service_account_info(st.secrets["gcp_service_account"])
 client = speech.SpeechClient()
-
 def audio_stream_generator(q):
-    """A generator function that yields audio chunks from the queue."""
+    """Generator function that yields audio chunks from a queue."""
     while True:
         chunk = q.get()
-        if chunk is None:  # Use None as a sentinel value to stop the generator.
-            return
-        yield chunk
+        if chunk is None:  # Use None as a signal to end the stream.
+            break
+        yield speech.StreamingRecognizeRequest(audio_content=chunk)
 
-def stream_audio(transcript_queue):
-    audio_q = queue.Queue()
+def stream_audio(transcript_queue, stop_event, device_index=None):
+    audio_q = queue.Queue(maxsize=10)
 
-    def callback(indata, frames, time, status):
-        """This is called for each audio chunk from the microphone."""
-        audio_q.put(np.ndarray.tobytes(indata))
+    def audio_callback(indata, frames, time, status):
+        if status:
+            print("Audio Input Error:", status, file=sys.stderr)
+        audio_q.put(bytes(indata))
 
-    with sd.InputStream(callback=callback, dtype='int16', channels=1, samplerate=16000):
-        print("Recording started...")
-
-        stream = audio_stream_generator(audio_q)
-
-        requests = (speech.StreamingRecognizeRequest(audio_content=chunk) for chunk in stream)
+    with sd.RawInputStream(callback=audio_callback, dtype='int16', channels=1, samplerate=16000, device=device_index):
+        requests = audio_stream_generator(audio_q)
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
             sample_rate_hertz=16000,
-            language_code="en-US",
+            language_code='en-US',
         )
         streaming_config = speech.StreamingRecognitionConfig(config=config, interim_results=True)
 
-        responses = client.streaming_recognize(config=streaming_config, requests=requests)
+        try:
+            responses = client.streaming_recognize(config=streaming_config, requests=requests)
+            for response in responses:
+                if response.error.code:
+                    print("Google Speech API Error:", response.error.message)
+                    break
 
-        for response in responses:
-            if not response.results:
-                continue
-            result = response.results[0]
-            if not result.alternatives:
-                continue
-            transcript = result.alternatives[0].transcript
-            transcript_queue.put(transcript)
+                for result in response.results:
+                    if result.is_final:
+                        transcript = result.alternatives[0].transcript
+                        transcript_queue.put(transcript)
+                        print("Transcript updated:", transcript)  # Debugging print
 
-        audio_q.put(None)  # Signal to generator to stop
+                if stop_event.is_set():
+                    print("Stop event triggered.")
+                    break
 
-# Streamlit app
+        except Exception as e:
+            print("Exception during streaming:", e)
+        finally:
+            audio_q.put(None)  # Signal the generator to terminate
+
 def main():
-    st.title("Real-time Audio Transcription")
+    st.title("Real-time Speech Recognition")
 
     transcript_queue = queue.Queue()
+    stop_event = threading.Event()
 
-    if 'transcription_thread' not in st.session_state:
-        st.session_state.transcription_thread = None
+    if st.button("Start Recording"):
+        if 'transcribe_thread' in st.session_state and st.session_state.transcribe_thread.is_alive():
+            st.warning("Recording is already in progress")
+        else:
+            stop_event.clear()
+            st.session_state.transcribe_thread = threading.Thread(target=stream_audio, args=(transcript_queue, stop_event), daemon=True)
+            st.session_state.transcribe_thread.start()
+            st.success("Recording started")
 
-    start_button, stop_button = st.columns(2)
-    with start_button:
-        if st.button("Start Recording"):
-            if st.session_state.transcription_thread is None or not st.session_state.transcription_thread.is_alive():
-                st.session_state.transcription_thread = threading.Thread(target=stream_audio, args=(transcript_queue,), daemon=True)
-                st.session_state.transcription_thread.start()
-
-    with stop_button:
-        if st.button("Stop Recording"):
-            if st.session_state.transcription_thread is not None:
-                transcript_queue.put(None)  # Stop the audio stream generator
-                st.session_state.transcription_thread.join()
-                st.session_state.transcription_thread = None
+    if st.button("Stop Recording"):
+        stop_event.set()
+        if 'transcribe_thread' in st.session_state:
+            st.session_state.transcribe_thread.join()
+            st.success("Recording stopped")
 
     if not transcript_queue.empty():
         transcript = transcript_queue.get()
-        st.write(transcript)
+        st.text_area("Transcript", value=transcript, height=300)
 
 if __name__ == "__main__":
     main()
