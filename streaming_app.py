@@ -55,6 +55,13 @@ def stream_audio(transcript_queue, stop_event, device_index=None):
         finally:
             audio_q.put(None)  # Signal the generator to terminate
 
+def generate_transcript(transcript_queue):
+    while True:
+        transcript = transcript_queue.get()
+        if transcript is None:
+            break
+        yield transcript
+
 def main():
     st.title("Real-time Speech Recognition")
 
@@ -75,10 +82,10 @@ def main():
         if 'transcribe_thread' in st.session_state:
             st.session_state.transcribe_thread.join()
             st.success("Recording stopped")
+            transcript_queue.put(None)  # Signal the generator to terminate
 
-    if not transcript_queue.empty():
-        transcript = transcript_queue.get()
-        st.text_area("Transcript", value=transcript, height=300)
+    transcript = generate_transcript(transcript_queue)
+    st.write_stream(transcript)
 
 if __name__ == "__main__":
     main()

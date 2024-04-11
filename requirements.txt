@@ -3,3 +3,4 @@ soundfile
 google-cloud-speech
 google-cloud-aiplatform
 vertexai
+streamlit==1.33.0
