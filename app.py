@@ -17,7 +17,7 @@ KBC_LOGO = image_path + "/static/keboola_mini.png"
 GC_LOGO = image_path + "/static/google_mini.png"
 
 # Function to capture audio
-def capture_audio(duration=15, fs=16000):
+def capture_audio(duration=59, fs=16000):
     sd.default.samplerate = fs
     sd.default.channels = 1
     audio_data = sd.rec(int(duration * fs), samplerate=fs, channels=1)
@@ -99,8 +99,8 @@ def main():
         <span>❤️</span>
     </div>
     '''
-
     st.markdown(f"{logo_html}", unsafe_allow_html=True)
+    st.markdown("####")
     st.title("Audio Recording and Summarization")
 
     recording_state = st.session_state.get('recording', False)
