@@ -4,10 +4,17 @@ import sounddevice as sd
 from google.cloud import speech
 from google.oauth2 import service_account
 import streamlit as st
+import sys
+import time
+import vertexai
+import vertexai.preview.generative_models as generative_models
+from vertexai.generative_models import GenerativeModel, Part, FinishReason
 
 # Assuming your Google Cloud credentials are set up in Streamlit's secrets
 #credentials = service_account.Credentials.from_service_account_info(st.secrets["gcp_service_account"])
+
 client = speech.SpeechClient()
+
 def audio_stream_generator(q):
     """Generator function that yields audio chunks from a queue."""
     while True:
@@ -55,17 +62,65 @@ def stream_audio(transcript_queue, stop_event, device_index=None):
         finally:
             audio_q.put(None)  # Signal the generator to terminate
 
-def generate_transcript(transcript_queue):
-    while True:
-        transcript = transcript_queue.get()
-        if transcript is None:
-            break
-        yield transcript
+
+def generate_summary(content):
+    vertexai.init(project="keboola-ai", location="us-central1")
+    model = GenerativeModel("gemini-1.5-pro-preview-0409")
+    #model = GenerativeModel("gemini-1.5-pro-latest")
+
+    generation_config = {
+        "max_output_tokens": 8192,
+        "temperature": 1,
+        "top_p": 0.95,
+    }
+    
+    safety_settings = {
+        generative_models.HarmCategory.HARM_CATEGORY_HATE_SPEECH: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        generative_models.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        generative_models.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        generative_models.HarmCategory.HARM_CATEGORY_HARASSMENT: generative_models.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    }
+    
+    responses = model.generate_content(
+        contents=f"Create a brief summary (1-2 sentences) of the following transcript: {content}",
+        generation_config=generation_config,
+        safety_settings=safety_settings,
+        stream=True,
+    )
+
+    output_text = "".join(response.text for response in responses)
+    return output_text
+
+#def generate_transcript(transcript_queue):
+ #   while True:
+  #      transcript = transcript_queue.get()
+   #     if transcript is None:
+    #        break
+     #   yield transcript
+
+def summary_update(transcript_queue, summary_queue, stop_event):
+    accumulated_text = ""
+    while not stop_event.is_set():
+        try:
+                transcript = transcript_queue.get_nowait()
+                if transcript:
+                    print(f"Received transcript: {transcript}")  # Just checkin
+                accumulated_text += " " + transcript
+        except queue.Empty:
+            if accumulated_text:
+                print(f"Accumulated transcript for summary: {accumulated_text}")  # Just checkin
+                summary = generate_summary(accumulated_text)
+                if summary:
+                    print(f"Generated summary: {summary}")  # Summary
+                summary_queue.put(summary)
+                accumulated_text = ""
+            time.sleep(30)  
 
 def main():
     st.title("Real-time Speech Recognition")
 
     transcript_queue = queue.Queue()
+    summary_queue = queue.Queue()
     stop_event = threading.Event()
 
     if st.button("Start Recording"):
@@ -74,18 +129,26 @@ def main():
         else:
             stop_event.clear()
             st.session_state.transcribe_thread = threading.Thread(target=stream_audio, args=(transcript_queue, stop_event), daemon=True)
+            st.session_state.summary_thread = threading.Thread(target=summary_update, args=(transcript_queue, summary_queue, stop_event), daemon=True)
             st.session_state.transcribe_thread.start()
+            st.session_state.summary_thread.start()
             st.success("Recording started")
 
     if st.button("Stop Recording"):
         stop_event.set()
         if 'transcribe_thread' in st.session_state:
             st.session_state.transcribe_thread.join()
+            st.session_state.summary_thread.join()
             st.success("Recording stopped")
-            transcript_queue.put(None)  # Signal the generator to terminate
+            #transcript_queue.put(None)  # Signal the generator to terminate
 
-    transcript = generate_transcript(transcript_queue)
-    st.write_stream(transcript)
+    if not summary_queue.empty():
+        print("Summaries:")
+        while not summary_queue.empty():
+            print(summary_queue.get())
+
+    #transcript = generate_transcript(st.session_state.transcript_queue)
+    #st.write_stream(transcript)
 
 if __name__ == "__main__":
     main()
