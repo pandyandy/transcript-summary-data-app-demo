@@ -3,4 +3,5 @@ soundfile
 google-cloud-speech
 google-cloud-aiplatform
 vertexai
+pyaudio
 streamlit==1.33.0
