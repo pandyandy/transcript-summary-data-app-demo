@@ -1,5 +1,6 @@
 sounddevice
 soundfile
+google-cloud
 google-cloud-speech
 google-cloud-aiplatform
 vertexai
