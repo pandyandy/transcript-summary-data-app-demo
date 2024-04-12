@@ -1,9 +1,5 @@
-sounddevice
-soundfile
-google-cloud
+streamlit==1.33.0
 google-cloud-speech
 google-cloud-aiplatform
 vertexai
-pyaudio
-streamlit==1.33.0
 streamlit-webrtc
