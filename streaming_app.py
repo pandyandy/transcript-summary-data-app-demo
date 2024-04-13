@@ -11,9 +11,6 @@ import vertexai
 import vertexai.preview.generative_models as generative_models
 from vertexai.generative_models import GenerativeModel, Part, FinishReason
 
-credentials = json.loads(st.secrets["google_cloud"]["credentials"])
-os.environ["GCLOUD_PROJECT"] = credentials
-
 def generate_summary(content):
     vertexai.init(project="keboola-ai", location="us-central1")
     model = generative_models.GenerativeModel("gemini-1.5-pro-preview-0409")
