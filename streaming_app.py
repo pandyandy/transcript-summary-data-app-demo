@@ -17,7 +17,7 @@ credentials = service_account.Credentials.from_service_account_info(
 )
 
 def generate_summary(content):
-    vertexai.init(project="keboola-ai", location="us-central1")
+    vertexai.init(project="keboola-ai", location="us-central1", credentials=credentials)
     model = generative_models.GenerativeModel("gemini-1.5-pro-preview-0409")
 
     generation_config = {
@@ -43,7 +43,7 @@ def generate_summary(content):
     return output_text
 
 def start_audio_stream(webrtc_ctx, transcript_queue, stop_event):
-    client = speech.SpeechClient()
+    client = speech.SpeechClient(credentials=credentials)
     config = speech.RecognitionConfig(
         encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
         sample_rate_hertz=16000,
