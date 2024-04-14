@@ -10,6 +10,11 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import vertexai
 import vertexai.preview.generative_models as generative_models
 from vertexai.generative_models import GenerativeModel, Part, FinishReason
+from google.oauth2 import service_account
+
+credentials = service_account.Credentials.from_service_account_info(
+    st.secrets["google_cloud"]
+)
 
 def generate_summary(content):
     vertexai.init(project="keboola-ai", location="us-central1")
